@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.36105.23 d17.13
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Verifactu", "Verifactu.csproj", "{7FF00459-AD34-41FE-851C-E4FB8DF6C759}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "..\Tests\Tests.csproj", "{16636A7F-7395-46C3-AC6D-37D8E6213967}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7FF00459-AD34-41FE-851C-E4FB8DF6C759}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7FF00459-AD34-41FE-851C-E4FB8DF6C759}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7FF00459-AD34-41FE-851C-E4FB8DF6C759}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7FF00459-AD34-41FE-851C-E4FB8DF6C759}.Release|Any CPU.Build.0 = Release|Any CPU
+		{16636A7F-7395-46C3-AC6D-37D8E6213967}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16636A7F-7395-46C3-AC6D-37D8E6213967}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16636A7F-7395-46C3-AC6D-37D8E6213967}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16636A7F-7395-46C3-AC6D-37D8E6213967}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7E7336CD-42F7-4301-868D-B5C28AEF4A47}
+	EndGlobalSection
+EndGlobal
