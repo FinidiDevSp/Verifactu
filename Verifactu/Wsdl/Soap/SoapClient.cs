@@ -25,24 +25,32 @@ public sealed class SoapClient
     /// <param name="soapAction">Cabecera SOAPAction (puede ser requerida por el servidor). Si no lo sabes, déjalo "".</param>
     /// <param name="request">Objeto de petición.</param>
     public async Task<TResponse?> PostAsync<TRequest, TResponse>(
-    string endpointUrl,
-    string? soapAction,
-    TRequest request)
-    where TRequest : class
-    where TResponse : class
+        string endpointUrl,
+        string? soapAction,
+        TRequest request)
+        where TRequest : class
+        where TResponse : class
     {
-        // 1) Serializa envelope y guarda petición
-        var envelope = new SoapEnvelope<TRequest>
-        {
-            Xmlns = BuildDefaultNamespaces(),
-            Body = new SoapBody<TRequest> { Content = request }
-        };
-
-        var xml = Serialize(envelope);
-        File.WriteAllText("last-request.xml", xml);
-
         try
         {
+            // 1) Serializa envelope y guarda petición
+            var envelope = new SoapEnvelope<TRequest>
+            {
+                Xmlns = BuildDefaultNamespaces(),
+                Body = new SoapBody<TRequest> { Content = request }
+            };
+
+            var xml = Serialize(envelope);
+
+            try
+            {
+                File.WriteAllText("last-request.xml", xml);
+            }
+            catch (Exception logEx)
+            {
+                Console.Error.WriteLine("No se pudo guardar last-request.xml:\n" + logEx);
+            }
+
             using var httpReq = new HttpRequestMessage(HttpMethod.Post, endpointUrl)
             {
                 Version = new Version(1, 1), // fuerza HTTP/1.1 (algunos endpoints fallan con HTTP/2)
@@ -60,7 +68,15 @@ public sealed class SoapClient
                                         .ConfigureAwait(false);
 
             var respXml = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-            File.WriteAllText("last-response.xml", respXml);
+
+            try
+            {
+                File.WriteAllText("last-response.xml", respXml);
+            }
+            catch (Exception logEx)
+            {
+                Console.Error.WriteLine("No se pudo guardar last-response.xml:\n" + logEx);
+            }
 
             if (!resp.IsSuccessStatusCode)
             {
@@ -81,13 +97,13 @@ public sealed class SoapClient
         }
         catch (HttpRequestException ex)
         {
-            File.WriteAllText("last-http-exception.txt", ex.ToString());
+            try { File.WriteAllText("last-http-exception.txt", ex.ToString()); } catch { }
             Console.Error.WriteLine("❌ HttpRequestException:\n" + ex);
             return null;
         }
         catch (Exception ex)
         {
-            File.WriteAllText("last-exception.txt", ex.ToString());
+            try { File.WriteAllText("last-exception.txt", ex.ToString()); } catch { }
             Console.Error.WriteLine("❌ Exception:\n" + ex);
             return null;
         }
