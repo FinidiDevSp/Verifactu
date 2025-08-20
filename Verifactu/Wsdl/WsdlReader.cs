@@ -1,55 +1,40 @@
 ﻿#nullable enable
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
 
 namespace Verifactu.Wsdl;
 
-/// <summary>
-/// Lector simple de WSDL para extraer la URL del endpoint y, si procede, SOAPAction por operación.
-/// </summary>
 public static class WsdlReader
 {
     private static readonly XNamespace nsWsdl = "http://schemas.xmlsoap.org/wsdl/";
     private static readonly XNamespace nsSoap = "http://schemas.xmlsoap.org/wsdl/soap/";
     private static readonly XNamespace nsSoap12 = "http://schemas.xmlsoap.org/wsdl/soap12/";
 
-    public static string? GetFirstEndpointUrl(string wsdlPath)
+    // ✅ Nuevo: coge la URL del endpoint por NOMBRE de port (no el primero que aparezca)
+    public static string? GetEndpointUrlByPort(string wsdlPath, string portName)
     {
         var x = XDocument.Load(wsdlPath);
-        // Busca <service>/<port>/<soap:address location="...">
-        var addr = x.Descendants(nsSoap + "address").Attributes("location").Select(a => a.Value).FirstOrDefault()
-                ?? x.Descendants(nsSoap12 + "address").Attributes("location").Select(a => a.Value).FirstOrDefault();
-        return addr;
+        var port = x.Descendants(nsWsdl + "port")
+            .FirstOrDefault(p => (string?)p.Attribute("name") == portName);
+        return port?.Element(nsSoap + "address")?.Attribute("location")?.Value
+               ?? port?.Element(nsSoap12 + "address")?.Attribute("location")?.Value;
     }
 
-    /// <summary>
-    /// Intenta obtener el SOAPAction de una operación por su nombre de operación (binding).
-    /// </summary>
+    // Para este WSDL, las operaciones vienen con soapAction="" → opcional/no enviar
     public static string? GetSoapAction(string wsdlPath, string operationName)
     {
         var x = XDocument.Load(wsdlPath);
+        var ops =
+            x.Descendants(nsWsdl + "binding")
+                .Descendants(nsWsdl + "operation")
+                .Select(op => new
+                {
+                    Name = (string?)op.Attribute("name"),
+                    SoapAction11 = (string?)op.Element(nsSoap + "operation")?.Attribute("soapAction"),
+                    SoapAction12 = (string?)op.Element(nsSoap12 + "operation")?.Attribute("soapAction"),
+                });
 
-        // Busca operaciones en soap 1.1 o 1.2
-        var soapOps11 = x.Descendants(nsWsdl + "binding")
-            .Descendants(nsWsdl + "operation")
-            .Select(op => new
-            {
-                Name = (string?)op.Attribute("name"),
-                SoapAction = (string?)op.Element(nsSoap + "operation")?.Attribute("soapAction")
-            });
-
-        var soapOps12 = x.Descendants(nsWsdl + "binding")
-            .Descendants(nsWsdl + "operation")
-            .Select(op => new
-            {
-                Name = (string?)op.Attribute("name"),
-                SoapAction = (string?)op.Element(nsSoap12 + "operation")?.Attribute("soapAction")
-            });
-
-        var ops = soapOps11.Concat(soapOps12);
-        var match = ops.FirstOrDefault(o => string.Equals(o.Name, operationName, StringComparison.OrdinalIgnoreCase));
-        return match?.SoapAction;
+        var match = ops.FirstOrDefault(o => string.Equals(o.Name, operationName, System.StringComparison.OrdinalIgnoreCase));
+        return match?.SoapAction11 ?? match?.SoapAction12; // suele ser ""
     }
 }

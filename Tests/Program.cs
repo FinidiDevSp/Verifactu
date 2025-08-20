@@ -11,4 +11,4 @@ TaskScheduler.UnobservedTaskException += (s, e) =>
     File.WriteAllText("fatal-unobserved-task.txt", e.Exception.ToString());
     Console.Error.WriteLine("💥 UnobservedTaskException:\n" + e.Exception);
 };
-QuickSendAlta.Main();
+await QuickSendAlta.Main();

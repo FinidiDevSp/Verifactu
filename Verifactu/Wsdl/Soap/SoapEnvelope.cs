@@ -3,31 +3,29 @@ using System.Xml.Serialization;
 
 namespace Verifactu.Wsdl.Soap;
 
-/// <summary>
-/// Envelope SOAP 1.1 para serializar peticiones/respuestas.
-/// </summary>
-[XmlRoot("Envelope", Namespace = Verifactu.Models.Common.VerifactuXmlNamespaces.SoapEnv)]
-public class SoapEnvelope<TBody>
+public static class SoapNamespaces
+{
+    public const string SoapEnv = Verifactu.Models.Common.VerifactuXmlNamespaces.SoapEnv;
+}
+
+[XmlRoot("Envelope", Namespace = SoapNamespaces.SoapEnv)]
+public class SoapEnvelope
 {
     [XmlNamespaceDeclarations]
     public XmlSerializerNamespaces? Xmlns { get; set; }
 
-    [XmlElement("Header", Order = 0)]
+    [XmlElement("Header", Namespace = SoapNamespaces.SoapEnv, Order = 0)]
     public SoapHeader? Header { get; set; }
 
-    [XmlElement("Body", Order = 1)]
-    public SoapBody<TBody>? Body { get; set; }
+    [XmlElement("Body", Namespace = SoapNamespaces.SoapEnv, Order = 1)]
+    public SoapBody Body { get; set; } = new();
 }
 
-public class SoapHeader
-{
-    // Puedes añadir aquí cabeceras personalizadas si el WSDL las define.
-    // De momento lo dejamos genérico.
-}
+public class SoapHeader { }
 
-public class SoapBody<T>
+public class SoapBody
 {
-    // Contenido real del cuerpo SOAP.
-    [XmlElement(Order = 0)]
-    public T? Content { get; set; }
+    // 👇 Clave: el payload se inserta tal cual, sin nombre "Any" ni "Content"
+    [XmlAnyElement]
+    public System.Xml.XmlElement? Payload { get; set; }
 }

@@ -2,6 +2,7 @@
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Xml;
 using System.Xml.Serialization;
 using Verifactu.Wsdl.Soap;
 
@@ -13,7 +14,6 @@ namespace Verifactu.Wsdl.Soap;
 public sealed class SoapClient
 {
     private readonly HttpClient _http;
-
     public SoapClient(HttpClient http) => _http = http;
 
     /// <summary>
@@ -27,21 +27,26 @@ public sealed class SoapClient
     public async Task<TResponse?> PostAsync<TRequest, TResponse>(
         string endpointUrl,
         string? soapAction,
-        TRequest request)
+        TRequest payload)
         where TRequest : class
         where TResponse : class
     {
         try
         {
-            // 1) Serializa envelope y guarda petición
-            var envelope = new SoapEnvelope<TRequest>
+            var env = new SoapEnvelope
             {
-                Xmlns = BuildDefaultNamespaces(),
-                Body = new SoapBody<TRequest> { Content = request }
+                Xmlns = new XmlSerializerNamespaces(new[]
+                {
+                    new XmlQualifiedName("soapenv", Verifactu.Models.Common.VerifactuXmlNamespaces.SoapEnv)
+                }),
+                Body = new SoapBody
+                {
+                    // Insertamos el elemento raíz real (RegFactuSistemaFacturacion, etc.)
+                    Payload = SerializePayloadToXmlElement(payload)
+                }
             };
 
-            var xml = Serialize(envelope);
-
+            var xml = Serialize(env);
             try
             {
                 File.WriteAllText("last-request.xml", xml);
@@ -51,22 +56,17 @@ public sealed class SoapClient
                 Console.Error.WriteLine("No se pudo guardar last-request.xml:\n" + logEx);
             }
 
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, endpointUrl)
+            using var req = new HttpRequestMessage(HttpMethod.Post, endpointUrl)
             {
-                Version = new Version(1, 1), // fuerza HTTP/1.1 (algunos endpoints fallan con HTTP/2)
+                Version = System.Net.HttpVersion.Version11,
                 Content = new StringContent(xml, Encoding.UTF8, "text/xml")
             };
 
-            httpReq.Headers.Accept.Clear();
-            httpReq.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/xml"));
-
-            // Solo si soapAction NO está vacío
+            // En este binding el SOAPAction suele ser "", puedes omitirlo:
             if (!string.IsNullOrWhiteSpace(soapAction))
-                httpReq.Headers.TryAddWithoutValidation("SOAPAction", soapAction);
+                req.Headers.TryAddWithoutValidation("SOAPAction", soapAction);
 
-            using var resp = await _http.SendAsync(httpReq, HttpCompletionOption.ResponseContentRead)
-                                        .ConfigureAwait(false);
-
+            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false);
             var respXml = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
 
             try
@@ -80,20 +80,21 @@ public sealed class SoapClient
 
             if (!resp.IsSuccessStatusCode)
             {
-                Console.Error.WriteLine($"HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}");
-                Console.Error.WriteLine("Respuesta SOAP (posible Fault):\n" + respXml);
-                return null; // o lanza una excepción con el contenido
+                throw new HttpRequestException($"HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}\n{respXml}");
+
             }
 
-            // Si el servidor devuelve Fault con 200 OK (pasa a veces),
-            // intenta detectar el nodo Fault:
-            if (respXml.Contains("<Fault") || respXml.Contains(":Fault"))
-            {
-                Console.Error.WriteLine("SOAP Fault con HTTP 200:\n" + respXml);
+
+            // Deserializamos el Envelope de respuesta capturando el primer hijo del Body
+            var ser = new XmlSerializer(typeof(SoapEnvelopeResponse));
+            using var sr = new StringReader(respXml);
+            if (ser.Deserialize(sr) is not SoapEnvelopeResponse envResp || envResp.Body?.Any is null)
                 return null;
-            }
 
-            return DeserializeResponse<TResponse>(respXml);
+            // Deserializa el elemento real del Body al tipo esperado de respuesta
+            var innerSer = new XmlSerializer(typeof(TResponse));
+            using var innerReader = new XmlNodeReader(envResp.Body.Any);
+            return innerSer.Deserialize(innerReader) as TResponse;
         }
         catch (HttpRequestException ex)
         {
@@ -109,57 +110,51 @@ public sealed class SoapClient
         }
     }
 
-
-    public static HttpClient CreateAeATClient(string pfxPath, string pfxPassword)
-    {
-        var handler = new HttpClientHandler
-        {
-            ClientCertificateOptions = ClientCertificateOption.Manual,
-            SslProtocols = System.Security.Authentication.SslProtocols.Tls12
-                           | System.Security.Authentication.SslProtocols.Tls13,
-            CheckCertificateRevocationList = true
-        };
-
-        var cert = new X509Certificate2(pfxPath, pfxPassword,
-            X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.EphemeralKeySet);
-        handler.ClientCertificates.Add(cert);
-
-        // Recomendable: Timeout más holgado
-        var http = new HttpClient(handler)
-        {
-            Timeout = TimeSpan.FromSeconds(60)
-        };
-        return http;
-    }
-
-    private static System.Xml.Serialization.XmlSerializerNamespaces BuildDefaultNamespaces()
-    {
-        var ns = new XmlSerializerNamespaces();
-        ns.Add("soapenv", Verifactu.Models.Common.VerifactuXmlNamespaces.SoapEnv);
-        // Puedes añadir aquí prefijos/URIs adicionales si el servidor los requiere.
-        return ns;
-    }
-
     private static string Serialize<T>(T obj)
     {
         var ser = new XmlSerializer(typeof(T));
-        using var ms = new MemoryStream();
         var settings = new System.Xml.XmlWriterSettings
         {
             Encoding = new UTF8Encoding(false),
             OmitXmlDeclaration = false,
             Indent = true
         };
+        using var ms = new MemoryStream();
         using var xw = System.Xml.XmlWriter.Create(ms, settings);
         ser.Serialize(xw, obj);
         return Encoding.UTF8.GetString(ms.ToArray());
     }
 
-    private static T? DeserializeResponse<T>(string xml) where T : class
+    // Serializa el payload con sus propios namespaces sum/sum1 para que salgan en su raíz
+    private static XmlElement SerializePayloadToXmlElement<T>(T obj) where T : class
     {
-        var envSer = new XmlSerializer(typeof(SoapEnvelope<T>));
-        using var sr = new StringReader(xml);
-        var env = (SoapEnvelope<T>?)envSer.Deserialize(sr);
-        return env?.Body?.Content; // puede ser null si el Body está vacío o es un Fault
+        var ns = new XmlSerializerNamespaces();
+        ns.Add("sum", Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroLR);
+        ns.Add("sum1", Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroInformacion);
+        ns.Add("xd", Verifactu.Models.Common.VerifactuXmlNamespaces.XmlDsig); // opcional
+
+        var ser = new XmlSerializer(typeof(T));
+        var settings = new System.Xml.XmlWriterSettings { OmitXmlDeclaration = true, Encoding = new UTF8Encoding(false) };
+        var sb = new StringBuilder();
+        using (var xw = XmlWriter.Create(sb, settings))
+            ser.Serialize(xw, obj, ns);
+
+        var doc = new XmlDocument();
+        doc.LoadXml(sb.ToString());
+        return doc.DocumentElement!;
     }
+}
+
+// Envelope solo para leer respuestas (captura "cualquier" hijo en el Body)
+[XmlRoot("Envelope", Namespace = Verifactu.Models.Common.VerifactuXmlNamespaces.SoapEnv)]
+public class SoapEnvelopeResponse
+{
+    [XmlElement("Body", Namespace = Verifactu.Models.Common.VerifactuXmlNamespaces.SoapEnv)]
+    public SoapBodyResponse? Body { get; set; }
+}
+
+public class SoapBodyResponse
+{
+    [XmlAnyElement]
+    public XmlElement? Any { get; set; }
 }

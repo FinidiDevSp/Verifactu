@@ -8,9 +8,12 @@ namespace Verifactu.Models.Operaciones;
 /// &lt;RegistroAlta&gt; pertenece al namespace de SuministroInformacion
 /// y contiene la estructura de la factura.
 /// </summary>
-[XmlType(AnonymousType = true, Namespace = VerifactuXmlNamespaces.SuministroInformacion)]
+[XmlType(AnonymousType = true, Namespace = Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroInformacion)]
 public class RegistroAlta
 {
+    // 👇 añade esto:
+    [XmlNamespaceDeclarations]
+    public XmlSerializerNamespaces? Xmlns { get; set; }
     // Para mantener fielmente la estructura del XSD, la "factura" es el propio contenido del nodo.
     // Es decir, todas las etiquetas que cuelgan de <RegistroAlta> están definidas en Factura.
     // Aquí la exponemos como composición para facilitar el uso en .NET (serializa inline).
