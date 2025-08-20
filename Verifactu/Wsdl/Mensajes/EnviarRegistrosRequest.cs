@@ -8,8 +8,8 @@ namespace Verifactu.Wsdl.Mensajes;
 /// Mensaje de petición para el envío de registros (Alta/Anulación).
 /// La raíz en Body suele ser el propio <RegFactuSistemaFacturacion/> (ns SuministroLR).
 /// </summary>
+// Wsdl/Mensajes/EnviarRegistrosRequest.cs
 [XmlRoot("RegFactuSistemaFacturacion", Namespace = Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroLR)]
-public class EnviarRegistrosRequest : RegFactuSistemaFacturacion
+public class EnviarRegistrosRequest : Verifactu.Models.Operaciones.RegFactuSistemaFacturacion
 {
-    // Hereda tal cual del modelo de operaciones.
 }

@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
+using Verifactu.Models.Wsdl.Soap;
 using Verifactu.Wsdl.Soap;
 
 namespace Verifactu.Wsdl.Soap;
@@ -25,9 +26,7 @@ public sealed class SoapClient
     /// <param name="soapAction">Cabecera SOAPAction (puede ser requerida por el servidor). Si no lo sabes, déjalo "".</param>
     /// <param name="request">Objeto de petición.</param>
     public async Task<TResponse?> PostAsync<TRequest, TResponse>(
-        string endpointUrl,
-        string? soapAction,
-        TRequest payload)
+        string endpointUrl, string? soapAction, TRequest payload)
         where TRequest : class
         where TResponse : class
     {
@@ -41,7 +40,7 @@ public sealed class SoapClient
                 }),
                 Body = new SoapBody
                 {
-                    // Insertamos el elemento raíz real (RegFactuSistemaFacturacion, etc.)
+                    // 👇 OJO: aquí va el elemento raíz real
                     Payload = SerializePayloadToXmlElement(payload)
                 }
             };
@@ -62,12 +61,13 @@ public sealed class SoapClient
                 Content = new StringContent(xml, Encoding.UTF8, "text/xml")
             };
 
-            // En este binding el SOAPAction suele ser "", puedes omitirlo:
             if (!string.IsNullOrWhiteSpace(soapAction))
-                req.Headers.TryAddWithoutValidation("SOAPAction", soapAction);
+                req.Headers.TryAddWithoutValidation("SOAPAction", soapAction); // en tu binding es "" → puedes omitir
 
             using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false);
             var respXml = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            resp.EnsureSuccessStatusCode();
+
 
             try
             {
@@ -85,16 +85,15 @@ public sealed class SoapClient
             }
 
 
-            // Deserializamos el Envelope de respuesta capturando el primer hijo del Body
-            var ser = new XmlSerializer(typeof(SoapEnvelopeResponse));
+            // Envelope de respuesta genérico
+            var envSer = new XmlSerializer(typeof(SoapEnvelopeResponse));
             using var sr = new StringReader(respXml);
-            if (ser.Deserialize(sr) is not SoapEnvelopeResponse envResp || envResp.Body?.Any is null)
+            if (envSer.Deserialize(sr) is not SoapEnvelopeResponse envResp || envResp.Body?.Any is null)
                 return null;
 
-            // Deserializa el elemento real del Body al tipo esperado de respuesta
             var innerSer = new XmlSerializer(typeof(TResponse));
-            using var innerReader = new XmlNodeReader(envResp.Body.Any);
-            return innerSer.Deserialize(innerReader) as TResponse;
+            using var xr = new XmlNodeReader(envResp.Body.Any);
+            return innerSer.Deserialize(xr) as TResponse;
         }
         catch (HttpRequestException ex)
         {
@@ -108,6 +107,25 @@ public sealed class SoapClient
             Console.Error.WriteLine("❌ Exception:\n" + ex);
             return null;
         }
+    }
+
+    private static XmlElement SerializePayloadToXmlElement<T>(T obj) where T : class
+    {
+        // 👉 Fuerza prefijos en el ROOT del payload
+        var ns = new XmlSerializerNamespaces();
+        ns.Add("sum", Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroLR);
+        ns.Add("sum1", Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroInformacion);
+        ns.Add("xd", Verifactu.Models.Common.VerifactuXmlNamespaces.XmlDsig); // opcional
+
+        var ser = new XmlSerializer(typeof(T));
+        var settings = new XmlWriterSettings { OmitXmlDeclaration = true, Encoding = new UTF8Encoding(false) };
+        var sb = new StringBuilder();
+        using (var xw = XmlWriter.Create(sb, settings))
+            ser.Serialize(xw, obj, ns);
+
+        var doc = new XmlDocument();
+        doc.LoadXml(sb.ToString());
+        return doc.DocumentElement!;
     }
 
     private static string Serialize<T>(T obj)
@@ -124,37 +142,12 @@ public sealed class SoapClient
         ser.Serialize(xw, obj);
         return Encoding.UTF8.GetString(ms.ToArray());
     }
-
-    // Serializa el payload con sus propios namespaces sum/sum1 para que salgan en su raíz
-    private static XmlElement SerializePayloadToXmlElement<T>(T obj) where T : class
-    {
-        var ns = new XmlSerializerNamespaces();
-        ns.Add("sum", Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroLR);
-        ns.Add("sum1", Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroInformacion);
-        ns.Add("xd", Verifactu.Models.Common.VerifactuXmlNamespaces.XmlDsig); // opcional
-
-        var ser = new XmlSerializer(typeof(T));
-        var settings = new System.Xml.XmlWriterSettings { OmitXmlDeclaration = true, Encoding = new UTF8Encoding(false) };
-        var sb = new StringBuilder();
-        using (var xw = XmlWriter.Create(sb, settings))
-            ser.Serialize(xw, obj, ns);
-
-        var doc = new XmlDocument();
-        doc.LoadXml(sb.ToString());
-        return doc.DocumentElement!;
-    }
 }
 
-// Envelope solo para leer respuestas (captura "cualquier" hijo en el Body)
 [XmlRoot("Envelope", Namespace = Verifactu.Models.Common.VerifactuXmlNamespaces.SoapEnv)]
 public class SoapEnvelopeResponse
 {
     [XmlElement("Body", Namespace = Verifactu.Models.Common.VerifactuXmlNamespaces.SoapEnv)]
     public SoapBodyResponse? Body { get; set; }
 }
-
-public class SoapBodyResponse
-{
-    [XmlAnyElement]
-    public XmlElement? Any { get; set; }
-}
+public class SoapBodyResponse { [XmlAnyElement] public XmlElement? Any { get; set; } }

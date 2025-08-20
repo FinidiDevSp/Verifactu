@@ -76,9 +76,9 @@ public static class QuickSendAlta
 
         var response = await soap.PostAsync<EnviarRegistrosRequest, Verifactu.Models.Respuestas.RespuestaSuministro>(
             endpointUrl,
-            string.IsNullOrWhiteSpace(soapAction) ? null : soapAction,
-            request
-        );
+            soapAction: null, // en tu binding es "", puedes omitirlo
+            payload: request
+        ); ;
 
         if (response is null)
         {
@@ -113,69 +113,61 @@ public static class QuickSendAlta
     {
         return new RegistroAlta
         {
-            // 👉 y aquí re-declaras el xmlns:sum1 en el propio nodo <sum1:RegistroAlta>
+            // y redeclarar xmlns sum1 en RegistroAlta:
             Xmlns = new XmlSerializerNamespaces(
-                new[] { new XmlQualifiedName("sum1", Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroInformacion) }),
+                    new[] { new XmlQualifiedName("sum1", Verifactu.Models.Common.VerifactuXmlNamespaces.SuministroInformacion) }),
+
             IDVersion = "1.0",
-            IDFactura = new IDFactura
+            NombreRazonEmisor = "PRUEBA",
+            IDFactura = new Verifactu.Models.Common.IDFactura
             {
-                IDEmisorFactura = "B20558805",
-                NumSerieFactura = "FA20250000240",
-                FechaExpedicionFactura = "04-06-2025"
+                IDEmisorFactura = "A12345678",
+                NumSerieFactura = "2025-0001",
+                FechaExpedicionFactura = "20-08-2025",
             },
-            RefExterna = "4562",
-            NombreRazonEmisor = "mi empresa",
             TipoFactura = "F1",
-            DescripcionOperacion = "venta mercaderias",
             Destinatarios = new Verifactu.Models.Common.Destinatarios
             {
                 IDDestinatario = new[]
-                {
-                    new Identificacion { NombreRazon = "nombre cliente", NIF = "B31456510" }
-                }
+                    {
+                        new Verifactu.Models.Common.Identificacion
+                        {
+                            NombreRazon = "Cliente de Pruebas S.L.",
+                            NIF = "B76543210"
+                        }
+                    }
             },
             Desglose = new Verifactu.Models.Common.Desglose
             {
                 DetalleDesglose = new[]
-                {
-                    new Verifactu.Models.Common.DetalleDesglose
                     {
-                        Impuesto = "01",
-                        ClaveRegimen = "01",
-                        CalificacionOperacion = "S1",
-                        TipoImpositivo = "10.00",
-                        BaseImponibleOimporteNoSujeto = "30.00",
-                        CuotaRepercutida = "3.00"
+                        new Verifactu.Models.Common.DetalleDesglose
+                        {
+                            Impuesto = "01",
+                            ClaveRegimen = "01",
+                            CalificacionOperacion = "E",
+                            TipoImpositivo = "21.00",
+                            BaseImponibleOimporteNoSujeto = "100.00",
+                            CuotaRepercutida = "21.00"
+                        }
                     }
-                }
             },
-            CuotaTotal = "3.00",
-            ImporteTotal = "33.00",
-            Encadenamiento = new Verifactu.Models.Common.Encadenamiento
-            {
-                RegistroAnterior = new Verifactu.Models.Common.RegistroAnterior
-                {
-                    IDEmisorFactura = "B20967550",
-                    NumSerieFactura = "OT20250000004",
-                    FechaExpedicionFactura = "04-06-2025",
-                    Huella = "89ACF6A4CD91356A1D120B2151FE55C8E56B3DFDDE61BBDD40C23FD423DF9428"
-                }
-            },
+            CuotaTotal = "21.00",
+            ImporteTotal = "121.00",
+            Encadenamiento = new Verifactu.Models.Common.Encadenamiento(), // vacío si es 1er registro de la serie
             SistemaInformatico = new Verifactu.Models.Common.SistemaInformatico
             {
-                NombreRazon = "mi empresa",
-                NIF = "mi cif",
-                NombreSistemaInformatico = "mi programa",
-                IdSistemaInformatico = "S1",
-                Version = "2.0.0.4",
-                NumeroInstalacion = "LCD-xx-xx-x",
+                NombreSistemaInformatico = "MiSIF Demo",
+                IdSistemaInformatico = "1001",
+                Version = "1.0.0",
+                NumeroInstalacion = "1",
                 TipoUsoPosibleSoloVerifactu = "S",
                 TipoUsoPosibleMultiOT = "N",
                 IndicadorMultiplesOT = "N"
             },
-            FechaHoraHusoGenRegistro = "2025-06-04T07:52:32+02:00",
+            FechaHoraHusoGenRegistro = "2025-08-20T09:30:17Z",
             TipoHuella = "01",
-            Huella = "084AEFF035020185FE4EFD95A97FEB5D19B58E6358E697D4A83E054AC5E8C377"
+            Huella = "ouBerxDICH/3kSYlLfnuga3ja6qu3+6po1c9h9743sQ="
         };
     }
 

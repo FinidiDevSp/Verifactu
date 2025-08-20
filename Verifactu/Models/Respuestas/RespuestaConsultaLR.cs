@@ -46,7 +46,9 @@ public class ResultadoConsulta
     public IDFactura? IDFactura { get; set; }
 
     /// <summary>Nombre/Razón del emisor si el servicio lo devuelve.</summary>
-    [XmlElement("NombreRazonEmisor", Order = 1)]
+    [XmlElement("" +
+                "NombreRazonEmisor" +
+                "", Order = 1)]
     public string? NombreRazonEmisor { get; set; }
 
     /// <summary>Tipo de factura (código oficial) si está presente.</summary>
