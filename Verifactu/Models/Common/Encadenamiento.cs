@@ -10,7 +10,9 @@ namespace Verifactu.Models.Common;
 [XmlType(AnonymousType = true, Namespace = VerifactuXmlNamespaces.SuministroInformacion)]
 public class Encadenamiento
 {
-    [XmlElement("RegistroAnterior", Order = 0)]
+    [XmlElement("PrimerRegistro", Order = 0)]
+    public string? PrimerRegistro { get; set; }  // "S" o "N"
+    [XmlElement("RegistroAnterior", Order = 1)]
     public RegistroAnterior? RegistroAnterior { get; set; }
 }
 

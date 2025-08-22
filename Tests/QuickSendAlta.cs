@@ -119,9 +119,10 @@ public static class QuickSendAlta
 
             IDVersion = "1.0",
             NombreRazonEmisor = "PRUEBA",
+            DescripcionOperacion = "Factura de prueba para Verifactu",
             IDFactura = new Verifactu.Models.Common.IDFactura
             {
-                IDEmisorFactura = "A12345678",
+                IDEmisorFactura = "B20558805",
                 NumSerieFactura = "2025-0001",
                 FechaExpedicionFactura = "20-08-2025",
             },
@@ -133,7 +134,7 @@ public static class QuickSendAlta
                         new Verifactu.Models.Common.Identificacion
                         {
                             NombreRazon = "Cliente de Pruebas S.L.",
-                            NIF = "B76543210"
+                            NIF = "B20558813"
                         }
                     }
             },
@@ -145,7 +146,7 @@ public static class QuickSendAlta
                         {
                             Impuesto = "01",
                             ClaveRegimen = "01",
-                            CalificacionOperacion = "E",
+                            CalificacionOperacion = "S1",
                             TipoImpositivo = "21.00",
                             BaseImponibleOimporteNoSujeto = "100.00",
                             CuotaRepercutida = "21.00"
@@ -154,11 +155,31 @@ public static class QuickSendAlta
             },
             CuotaTotal = "21.00",
             ImporteTotal = "121.00",
-            Encadenamiento = new Verifactu.Models.Common.Encadenamiento(), // vacío si es 1er registro de la serie
+            Encadenamiento = new Encadenamiento
+            {
+                PrimerRegistro = "S",
+                RegistroAnterior = null
+            },
+            /*
+            Encadenamiento = new Encadenamiento
+            {
+                PrimerRegistro = "N",
+                RegistroAnterior = new RegistroAnterior
+                {
+                    IDEmisorFactura = "MI-CIF",
+                    NumSerieFactura = "OT20250000004",
+                    FechaExpedicionFactura = "04-06-2025",
+                    Huella = "89ACF6A4CD91356A1D120B2..."
+                }
+            }
+            */
+
             SistemaInformatico = new Verifactu.Models.Common.SistemaInformatico
             {
                 NombreSistemaInformatico = "MiSIF Demo",
-                IdSistemaInformatico = "1001",
+                NombreRazon = "PRIUEBA",
+                NIF = "B20558805",
+                IdSistemaInformatico = "77",
                 Version = "1.0.0",
                 NumeroInstalacion = "1",
                 TipoUsoPosibleSoloVerifactu = "S",
