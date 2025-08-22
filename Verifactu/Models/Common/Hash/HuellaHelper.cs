@@ -58,4 +58,30 @@ public static class HuellaHelper
         var hash = sha.ComputeHash(bytes);
         return Convert.ToBase64String(hash);
     }
+
+    /// <summary>
+    /// Calcula la huella del <see cref="RegistroAnulacion"/> con un canónico predecible.
+    /// </summary>
+    public static string ComputeHuellaRegistroAnulacion(RegistroAnulacion anulacion)
+    {
+        // Canon mínimo: IDVersion|IDEmisorFactura|NumSerie|Fecha|RechazoPrevio|SinRegistroPrevio|FechaHoraHusoGenRegistro
+        // *Sin espacios*, *separado por '|'* y valores nulos como "".
+        string S(string? v) => v?.Trim() ?? "";
+
+        var canon = string.Join("|", new[]
+        {
+            S(anulacion.IDVersion),
+            S(anulacion.IDFacturaAnulada?.IDEmisorFacturaAnulada),
+            S(anulacion.IDFacturaAnulada?.NumSerieFacturaAnulada),
+            S(anulacion.IDFacturaAnulada?.FechaExpedicionFacturaAnulada),
+            S(anulacion.RechazoPrevio),
+            S(anulacion.SinRegistroPrevio),
+            S(anulacion.FechaHoraHusoGenRegistro)
+        });
+
+        using var sha = SHA256.Create();
+        var bytes = Encoding.UTF8.GetBytes(canon);
+        var hash = sha.ComputeHash(bytes);
+        return Convert.ToBase64String(hash);
+    }
 }

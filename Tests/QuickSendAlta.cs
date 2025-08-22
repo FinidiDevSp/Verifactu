@@ -111,7 +111,7 @@ public static class QuickSendAlta
 
     private static RegistroAlta BuildAlta()
     {
-        return new RegistroAlta
+        var alta = new RegistroAlta
         {
             // y redeclarar xmlns sum1 en RegistroAlta:
             Xmlns = new XmlSerializerNamespaces(
@@ -187,9 +187,11 @@ public static class QuickSendAlta
                 IndicadorMultiplesOT = "N"
             },
             FechaHoraHusoGenRegistro = "2025-08-20T09:30:17Z",
-            TipoHuella = "01",
-            Huella = "ouBerxDICH/3kSYlLfnuga3ja6qu3+6po1c9h9743sQ="
         };
+
+        alta.TipoHuella = "01";
+        alta.Huella = HuellaHelper.ComputeHuellaRegistroAlta(alta);
+        return alta;
     }
 
     private static X509Certificate2 LoadClientCertificate(string pfxPath, string? password)
