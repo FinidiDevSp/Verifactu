@@ -12,6 +12,7 @@ using Verifactu.Wsdl.Mensajes;
 using Verifactu.Wsdl;
 using System.Net.Security;
 using System.Net;
+using System.Runtime.InteropServices.JavaScript;
 using System.Security.Authentication;
 using System.Xml;
 using System.Xml.Serialization;
@@ -111,6 +112,7 @@ public static class QuickSendAlta
 
     private static RegistroAlta BuildAlta()
     {
+        var fechaUso = HuellaHelper.FormatearFechaHoraOffset(DateTime.Now);
         var alta = new RegistroAlta
         {
             // y redeclarar xmlns sum1 en RegistroAlta:
@@ -123,7 +125,7 @@ public static class QuickSendAlta
             IDFactura = new Verifactu.Models.Common.IDFactura
             {
                 IDEmisorFactura = "B20558805",
-                NumSerieFactura = "2025-0002",
+                NumSerieFactura = "2025-0011",
                 FechaExpedicionFactura = "20-08-2025",
             },
             TipoFactura = "F1",
@@ -167,9 +169,9 @@ public static class QuickSendAlta
                 RegistroAnterior = new RegistroAnterior
                 {
                     IDEmisorFactura = "B20558805",
-                    NumSerieFactura = "2025-0001",
+                    NumSerieFactura = "2025-0010",
                     FechaExpedicionFactura = "20-08-2025",
-                    Huella = "89ACF6A4CD91356A1D120B2..."
+                    Huella = "4A2CAD51788E4F0FB3268AA2E9AD5F929816398766BFAD7F10A8BF4C482D9362"
                 }
             },
             
@@ -186,11 +188,11 @@ public static class QuickSendAlta
                 TipoUsoPosibleMultiOT = "N",
                 IndicadorMultiplesOT = "N"
             },
-            FechaHoraHusoGenRegistro = "2025-08-20T09:30:17Z",
+            FechaHoraHusoGenRegistro = fechaUso 
         };
 
         alta.TipoHuella = "01";
-        alta.Huella = HuellaHelper.CalcularHuellaAlta(alta.IDFactura.IDEmisorFactura,alta.IDFactura.NumSerieFactura,alta.IDFactura.FechaExpedicionFactura,alta.TipoFactura,alta.CuotaTotal,alta.ImporteTotal,alta.Encadenamiento.RegistroAnterior.Huella,DateTime.Now);
+        alta.Huella = HuellaHelper.CalcularHuellaAlta(alta.IDFactura.IDEmisorFactura,alta.IDFactura.NumSerieFactura,alta.IDFactura.FechaExpedicionFactura,alta.TipoFactura,alta.CuotaTotal,alta.ImporteTotal,alta.Encadenamiento.RegistroAnterior.Huella, fechaUso);
         return alta;
     }
 

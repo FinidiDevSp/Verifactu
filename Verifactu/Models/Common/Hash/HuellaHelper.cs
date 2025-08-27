@@ -15,101 +15,92 @@ namespace Verifactu.Models.Common.Hash;
 /// </summary>
 public static class HuellaHelper
 {
-    // === Alta ===
-    public static string CalcularHuellaAlta(
-        string idEmisorFactura,
-        string numSerieFactura,
-        string fechaExpedicionFactura,      // "dd-MM-yyyy"
-        string tipoFactura,
-        string? cuotaTotal,                // admite null
-        decimal? importeTotal,              // admite null
-        string huellaRegistroAnterior,      // null/"" si es el primer registro
-        string fechaHoraHusoGenRegistro     // ISO 8601, p.ej. "2024-01-01T19:20:30+01:00"
-    )
+    // === SHA-256(UTF-8(cadena)) -> HEX mayúsculas ===
+    public static string GetHashVerifactu(string msg)
     {
-        string cadena =
-            "IDEmisorFactura=" + TrimOrEmpty(idEmisorFactura) + "&" +
-            "NumSerieFactura=" + TrimOrEmpty(numSerieFactura) + "&" +
-            "FechaExpedicionFactura=" + TrimOrEmpty(fechaExpedicionFactura) + "&" +
-            "TipoFactura=" + TrimOrEmpty(tipoFactura) + "&" +
-            "CuotaTotal=" + TrimOrEmpty( cuotaTotal) + "&" +
-            "ImporteTotal=" + FormatDecimalOrEmpty(importeTotal) + "&" +
-            "Huella=" + TrimOrEmpty(huellaRegistroAnterior) + "&" +
-            "FechaHoraHusoGenRegistro=" + TrimOrEmpty(fechaHoraHusoGenRegistro);
-
-        return Sha256HexUpper(cadena);
-    }
-
-    // === Anulación ===
-    public static string CalcularHuellaAnulacion(
-        string idEmisorFacturaAnulada,
-        string numSerieFacturaAnulada,
-        string fechaExpedicionFacturaAnulada,  // "dd-MM-yyyy"
-        string huellaRegistroAnterior,
-        string fechaHoraHusoGenRegistro        // ISO 8601
-    )
-    {
-        string cadena =
-            "IDEmisorFacturaAnulada=" + TrimOrEmpty(idEmisorFacturaAnulada) + "&" +
-            "NumSerieFacturaAnulada=" + TrimOrEmpty(numSerieFacturaAnulada) + "&" +
-            "FechaExpedicionFacturaAnulada=" + TrimOrEmpty(fechaExpedicionFacturaAnulada) + "&" +
-            "Huella=" + TrimOrEmpty(huellaRegistroAnterior) + "&" +
-            "FechaHoraHusoGenRegistro=" + TrimOrEmpty(fechaHoraHusoGenRegistro);
-
-        return Sha256HexUpper(cadena);
-    }
-
-    // === Evento ===
-    public static string CalcularHuellaEvento(
-        string nifSistemaInformatico,     // si no se informa, pasa "" y usa ID
-        string idSistemaInformaticoOtro,  // ID de IDOtro; si no se informa, pasa ""
-        string idSistemaInformatico,      // IdSistemaInformatico
-        string version,
-        string numeroInstalacion,
-        string nifObligadoEmision,
-        string tipoEvento,
-        string huellaEventoAnterior,
-        string fechaHoraHusoGenEvento
-    )
-    {
-        string cadena =
-            "NIF=" + TrimOrEmpty(nifSistemaInformatico) + "&" +
-            "ID=" + TrimOrEmpty(idSistemaInformaticoOtro) + "&" +
-            "IdSistemaInformatico=" + TrimOrEmpty(idSistemaInformatico) + "&" +
-            "Version=" + TrimOrEmpty(version) + "&" +
-            "NumeroInstalacion=" + TrimOrEmpty(numeroInstalacion) + "&" +
-            "NIF=" + TrimOrEmpty(nifObligadoEmision) + "&" +
-            "TipoEvento=" + TrimOrEmpty(tipoEvento) + "&" +
-            "HuellaEvento=" + TrimOrEmpty(huellaEventoAnterior) + "&" +
-            "FechaHoraHusoGenEvento=" + TrimOrEmpty(fechaHoraHusoGenEvento);
-
-        return Sha256HexUpper(cadena);
-    }
-
-    // === Helpers ===
-
-    private static string TrimOrEmpty(string? s) =>
-        (s ?? string.Empty).Trim();
-
-    // Formatea con punto decimal y sin ceros a la derecha innecesarios
-    // Cumple que 123.1 y 123.10 se tratan indistintamente para el hash.
-    private static string FormatDecimalOrEmpty(decimal? value)
-    {
-        if (!value.HasValue) return string.Empty;
-        // Usa InvariantCulture y hasta 2 decimales, sin ceros de relleno a la derecha
-        // (ajústalo si en tu sistema hay más de 2 decimales).
-        string s = value.Value.ToString("0.##", CultureInfo.InvariantCulture);
-        return s.Trim();
-    }
-
-    private static string Sha256HexUpper(string input)
-    {
-        byte[] data = Encoding.UTF8.GetBytes(input);
         using var sha = SHA256.Create();
-        byte[] hash = sha.ComputeHash(data);
+        var bytes = Encoding.UTF8.GetBytes(msg); // UTF-8 requerido
+        var hash = sha.ComputeHash(bytes);
         var sb = new StringBuilder(hash.Length * 2);
-        foreach (var b in hash)
-            sb.Append(b.ToString("X2")); // mayúsculas
+        foreach (var b in hash) sb.Append(b.ToString("X2"));
         return sb.ToString();
     }
+
+    // === Helpers de construcción de la cadena ===
+    private static string GetValorCampo(string nombre, string? valor, bool separador)
+    {
+        string campo = nombre + "=" + ((valor == null) ? "" : valor.Trim());
+        return separador ? campo + "&" : campo;
+    }
+
+    // Decimal con punto y sin ceros de relleno innecesarios (123.10 -> 123.1)
+    private static string GetValorCampoDecimal(string nombre, decimal? valor, bool separador)
+    {
+        string s = (valor.HasValue) ? valor.Value.ToString("0.##", CultureInfo.InvariantCulture) : "";
+        return GetValorCampo(nombre, s, separador);
+    }
+
+    // === Referencia (cadena) para ALTA ===
+    public static string GetReferenciaRegistroAlta(
+        string nifEmisor,
+        string numFacturaSerie,
+        string fechaExpedicion,        // "dd-MM-yyyy" tal como va al XML
+        string tipoFactura,
+        string cuotaTotal,
+        string importeTotal,
+        string huellaAnterior,         // "" si primer registro
+        string fechaHoraHusoRegistro   // "yyyy-MM-ddTHH:mm:sszzz" (ISO 8601 con offset)
+    )
+    {
+        return
+            "IDEmisorFactura=" + (nifEmisor?.Trim() ?? "") + "&" +
+            "NumSerieFactura=" + (numFacturaSerie?.Trim() ?? "") + "&" +
+            "FechaExpedicionFactura=" + (fechaExpedicion?.Trim() ?? "") + "&" +
+            "TipoFactura=" + (tipoFactura.Trim() ?? "") + "&" +
+            "CuotaTotal=" + (cuotaTotal.Trim() ?? "") + "&" +
+            "ImporteTotal=" + (importeTotal?.Trim() ?? "") + "&" +
+            "Huella=" + (huellaAnterior?.Trim() ?? "") + "&" +
+            "FechaHoraHusoGenRegistro=" + (fechaHoraHusoRegistro?.Trim() ?? "");
+    }
+
+    // === Huella ALTA (atajo) ===
+    public static string CalcularHuellaAlta(
+        string nifEmisor, string numFacturaSerie, string fechaExpedicion, string tipoFactura,
+       string cuotaTotal, string importeTotal, string huellaAnterior, string fechaHoraHusoRegistro)
+    {
+        string referencia = GetReferenciaRegistroAlta(nifEmisor, numFacturaSerie, fechaExpedicion, tipoFactura,
+                                                      cuotaTotal, importeTotal, huellaAnterior, fechaHoraHusoRegistro);
+        return GetHashVerifactu(referencia);
+    }
+
+    // === Referencia (cadena) para ANULACIÓN ===
+    public static string GetReferenciaRegistroAnulacion(
+        string nifEmisorFacturaAnulada,
+        string numSerieFacturaAnulada,
+        string fechaExpedicionFacturaAnulada, // "dd-MM-yyyy"
+        string huellaAnterior,
+        string fechaHoraHusoRegistro          // ISO 8601 con offset
+    )
+    {
+        var sb = new StringBuilder();
+        sb.Append(GetValorCampo("IDEmisorFacturaAnulada", nifEmisorFacturaAnulada, true))
+          .Append(GetValorCampo("NumSerieFacturaAnulada", numSerieFacturaAnulada, true))
+          .Append(GetValorCampo("FechaExpedicionFacturaAnulada", fechaExpedicionFacturaAnulada, true))
+          .Append(GetValorCampo("Huella", huellaAnterior, true))
+          .Append(GetValorCampo("FechaHoraHusoGenRegistro", fechaHoraHusoRegistro, false));
+        return sb.ToString();
+    }
+
+    public static string CalcularHuellaAnulacion(
+        string nifEmisorFacturaAnulada, string numSerieFacturaAnulada, string fechaExpedicionFacturaAnulada,
+        string huellaAnterior, string fechaHoraHusoRegistro)
+    {
+        string referencia = GetReferenciaRegistroAnulacion(
+            nifEmisorFacturaAnulada, numSerieFacturaAnulada, fechaExpedicionFacturaAnulada,
+            huellaAnterior, fechaHoraHusoRegistro);
+        return GetHashVerifactu(referencia);
+    }
+
+    // === Helper de fecha/hora con offset: DateTime -> "yyyy-MM-ddTHH:mm:sszzz" ===
+    public static string FormatearFechaHoraOffset(DateTime dt) => dt.ToString("yyyy-MM-ddTHH:mm:sszzz");
 }
