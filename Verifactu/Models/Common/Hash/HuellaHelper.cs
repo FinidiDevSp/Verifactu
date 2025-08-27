@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using System;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Serialization;
@@ -14,74 +15,101 @@ namespace Verifactu.Models.Common.Hash;
 /// </summary>
 public static class HuellaHelper
 {
-    /// <summary>
-    /// Calcula la huella del <see cref="RegistroAlta"/> con un canónico predecible.
-    /// </summary>
-    public static string ComputeHuellaRegistroAlta(RegistroAlta alta)
+    // === Alta ===
+    public static string CalcularHuellaAlta(
+        string idEmisorFactura,
+        string numSerieFactura,
+        string fechaExpedicionFactura,      // "dd-MM-yyyy"
+        string tipoFactura,
+        string? cuotaTotal,                // admite null
+        decimal? importeTotal,              // admite null
+        string huellaRegistroAnterior,      // null/"" si es el primer registro
+        string fechaHoraHusoGenRegistro     // ISO 8601, p.ej. "2024-01-01T19:20:30+01:00"
+    )
     {
-        // Canonización mínima y determinista de los campos críticos:
-        // - IDVersion|IDEmisorFactura|NumSerie|Fecha|TipoFactura|CuotaTotal|ImporteTotal
-        // - Primer destinatario (si existe): NIF o IDOtro.ID
-        // - Primer detalle de desglose: Impuesto|TipoImpositivo|Base|Cuota
-        // - FechaHoraHusoGenRegistro
-        // *Sin espacios*, *con separador '|'* y valores nulos como "".
-        string S(string? v) => v?.Trim() ?? "";
-        var idDest = alta.Destinatarios?.IDDestinatario != null && alta.Destinatarios.IDDestinatario.Length > 0
-            ? (S(alta.Destinatarios.IDDestinatario[0].NIF) != ""
-                ? S(alta.Destinatarios.IDDestinatario[0].NIF)
-                : S(alta.Destinatarios.IDDestinatario[0].IDOtro?.ID))
-            : "";
+        string cadena =
+            "IDEmisorFactura=" + TrimOrEmpty(idEmisorFactura) + "&" +
+            "NumSerieFactura=" + TrimOrEmpty(numSerieFactura) + "&" +
+            "FechaExpedicionFactura=" + TrimOrEmpty(fechaExpedicionFactura) + "&" +
+            "TipoFactura=" + TrimOrEmpty(tipoFactura) + "&" +
+            "CuotaTotal=" + TrimOrEmpty( cuotaTotal) + "&" +
+            "ImporteTotal=" + FormatDecimalOrEmpty(importeTotal) + "&" +
+            "Huella=" + TrimOrEmpty(huellaRegistroAnterior) + "&" +
+            "FechaHoraHusoGenRegistro=" + TrimOrEmpty(fechaHoraHusoGenRegistro);
 
-        var det = alta.Desglose?.DetalleDesglose != null && alta.Desglose.DetalleDesglose.Length > 0
-            ? alta.Desglose.DetalleDesglose[0]
-            : null;
-
-        var canon = string.Join("|", new[]
-        {
-            S(alta.IDVersion),
-            S(alta.IDFactura?.IDEmisorFactura),
-            S(alta.IDFactura?.NumSerieFactura),
-            S(alta.IDFactura?.FechaExpedicionFactura),
-            S(alta.TipoFactura),
-            S(alta.CuotaTotal),
-            S(alta.ImporteTotal),
-            idDest,
-            S(det?.Impuesto),
-            S(det?.TipoImpositivo),
-            S(det?.BaseImponibleOimporteNoSujeto),
-            S(det?.CuotaRepercutida),
-            S(alta.FechaHoraHusoGenRegistro)
-        });
-
-        using var sha = SHA256.Create();
-        var bytes = Encoding.UTF8.GetBytes(canon);
-        var hash = sha.ComputeHash(bytes);
-        return Convert.ToBase64String(hash);
+        return Sha256HexUpper(cadena);
     }
 
-    /// <summary>
-    /// Calcula la huella del <see cref="RegistroAnulacion"/> con un canónico predecible.
-    /// </summary>
-    public static string ComputeHuellaRegistroAnulacion(RegistroAnulacion anulacion)
+    // === Anulación ===
+    public static string CalcularHuellaAnulacion(
+        string idEmisorFacturaAnulada,
+        string numSerieFacturaAnulada,
+        string fechaExpedicionFacturaAnulada,  // "dd-MM-yyyy"
+        string huellaRegistroAnterior,
+        string fechaHoraHusoGenRegistro        // ISO 8601
+    )
     {
-        // Canon mínimo: IDVersion|IDEmisorFactura|NumSerie|Fecha|RechazoPrevio|SinRegistroPrevio|FechaHoraHusoGenRegistro
-        // *Sin espacios*, *separado por '|'* y valores nulos como "".
-        string S(string? v) => v?.Trim() ?? "";
+        string cadena =
+            "IDEmisorFacturaAnulada=" + TrimOrEmpty(idEmisorFacturaAnulada) + "&" +
+            "NumSerieFacturaAnulada=" + TrimOrEmpty(numSerieFacturaAnulada) + "&" +
+            "FechaExpedicionFacturaAnulada=" + TrimOrEmpty(fechaExpedicionFacturaAnulada) + "&" +
+            "Huella=" + TrimOrEmpty(huellaRegistroAnterior) + "&" +
+            "FechaHoraHusoGenRegistro=" + TrimOrEmpty(fechaHoraHusoGenRegistro);
 
-        var canon = string.Join("|", new[]
-        {
-            S(anulacion.IDVersion),
-            S(anulacion.IDFacturaAnulada?.IDEmisorFacturaAnulada),
-            S(anulacion.IDFacturaAnulada?.NumSerieFacturaAnulada),
-            S(anulacion.IDFacturaAnulada?.FechaExpedicionFacturaAnulada),
-            S(anulacion.RechazoPrevio),
-            S(anulacion.SinRegistroPrevio),
-            S(anulacion.FechaHoraHusoGenRegistro)
-        });
+        return Sha256HexUpper(cadena);
+    }
 
+    // === Evento ===
+    public static string CalcularHuellaEvento(
+        string nifSistemaInformatico,     // si no se informa, pasa "" y usa ID
+        string idSistemaInformaticoOtro,  // ID de IDOtro; si no se informa, pasa ""
+        string idSistemaInformatico,      // IdSistemaInformatico
+        string version,
+        string numeroInstalacion,
+        string nifObligadoEmision,
+        string tipoEvento,
+        string huellaEventoAnterior,
+        string fechaHoraHusoGenEvento
+    )
+    {
+        string cadena =
+            "NIF=" + TrimOrEmpty(nifSistemaInformatico) + "&" +
+            "ID=" + TrimOrEmpty(idSistemaInformaticoOtro) + "&" +
+            "IdSistemaInformatico=" + TrimOrEmpty(idSistemaInformatico) + "&" +
+            "Version=" + TrimOrEmpty(version) + "&" +
+            "NumeroInstalacion=" + TrimOrEmpty(numeroInstalacion) + "&" +
+            "NIF=" + TrimOrEmpty(nifObligadoEmision) + "&" +
+            "TipoEvento=" + TrimOrEmpty(tipoEvento) + "&" +
+            "HuellaEvento=" + TrimOrEmpty(huellaEventoAnterior) + "&" +
+            "FechaHoraHusoGenEvento=" + TrimOrEmpty(fechaHoraHusoGenEvento);
+
+        return Sha256HexUpper(cadena);
+    }
+
+    // === Helpers ===
+
+    private static string TrimOrEmpty(string? s) =>
+        (s ?? string.Empty).Trim();
+
+    // Formatea con punto decimal y sin ceros a la derecha innecesarios
+    // Cumple que 123.1 y 123.10 se tratan indistintamente para el hash.
+    private static string FormatDecimalOrEmpty(decimal? value)
+    {
+        if (!value.HasValue) return string.Empty;
+        // Usa InvariantCulture y hasta 2 decimales, sin ceros de relleno a la derecha
+        // (ajústalo si en tu sistema hay más de 2 decimales).
+        string s = value.Value.ToString("0.##", CultureInfo.InvariantCulture);
+        return s.Trim();
+    }
+
+    private static string Sha256HexUpper(string input)
+    {
+        byte[] data = Encoding.UTF8.GetBytes(input);
         using var sha = SHA256.Create();
-        var bytes = Encoding.UTF8.GetBytes(canon);
-        var hash = sha.ComputeHash(bytes);
-        return Convert.ToBase64String(hash);
+        byte[] hash = sha.ComputeHash(data);
+        var sb = new StringBuilder(hash.Length * 2);
+        foreach (var b in hash)
+            sb.Append(b.ToString("X2")); // mayúsculas
+        return sb.ToString();
     }
 }

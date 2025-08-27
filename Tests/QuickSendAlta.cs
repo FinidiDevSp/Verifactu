@@ -123,7 +123,7 @@ public static class QuickSendAlta
             IDFactura = new Verifactu.Models.Common.IDFactura
             {
                 IDEmisorFactura = "B20558805",
-                NumSerieFactura = "2025-0001",
+                NumSerieFactura = "2025-0002",
                 FechaExpedicionFactura = "20-08-2025",
             },
             TipoFactura = "F1",
@@ -155,24 +155,24 @@ public static class QuickSendAlta
             },
             CuotaTotal = "21.00",
             ImporteTotal = "121.00",
-            Encadenamiento = new Encadenamiento
+           /* Encadenamiento = new Encadenamiento
             {
                 PrimerRegistro = "S",
                 RegistroAnterior = null
-            },
-            /*
+            },*/
+            
             Encadenamiento = new Encadenamiento
             {
-                PrimerRegistro = "N",
+                //PrimerRegistro = "N",
                 RegistroAnterior = new RegistroAnterior
                 {
-                    IDEmisorFactura = "MI-CIF",
-                    NumSerieFactura = "OT20250000004",
-                    FechaExpedicionFactura = "04-06-2025",
+                    IDEmisorFactura = "B20558805",
+                    NumSerieFactura = "2025-0001",
+                    FechaExpedicionFactura = "20-08-2025",
                     Huella = "89ACF6A4CD91356A1D120B2..."
                 }
-            }
-            */
+            },
+            
 
             SistemaInformatico = new Verifactu.Models.Common.SistemaInformatico
             {
@@ -190,7 +190,7 @@ public static class QuickSendAlta
         };
 
         alta.TipoHuella = "01";
-        alta.Huella = HuellaHelper.ComputeHuellaRegistroAlta(alta);
+        alta.Huella = HuellaHelper.CalcularHuellaAlta(alta.IDFactura.IDEmisorFactura,alta.IDFactura.NumSerieFactura,alta.IDFactura.FechaExpedicionFactura,alta.TipoFactura,alta.CuotaTotal,alta.ImporteTotal,alta.Encadenamiento.RegistroAnterior.Huella,DateTime.Now);
         return alta;
     }
 
